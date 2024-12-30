@@ -1,7 +1,8 @@
 import os
 import ray
 
-from experiment_runner import run_batch, generate_plots
+from experiment_runner import run_batch
+from experiment_plots import generate_plots
 
 identifier = "Egor_test"
 kind = "IV"

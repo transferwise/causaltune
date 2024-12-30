@@ -1,6 +1,7 @@
 import os
 
-from experiment_runner import run_batch, generate_plots
+from experiment_runner import run_batch, get_estimator_list
+from experiment_plots import generate_plots
 
 identifier = "Egor_test"
 kind = "KCKP"
@@ -16,8 +17,14 @@ metrics = [
     "bite",  # NEW
 ]
 use_ray = True
+estimators = get_estimator_list(kind)
 out_dir = run_batch(
-    identifier, kind, metrics, dataset_path=os.path.realpath("../RunDatasets"), use_ray=use_ray
+    identifier,
+    kind,
+    metrics,
+    estimators=estimators,
+    dataset_path=os.path.realpath("../RunDatasets"),
+    use_ray=use_ray,
 )
 # plot results
 # upper_bounds = {"MSE": 1e2, "policy_risk": 0.2}
