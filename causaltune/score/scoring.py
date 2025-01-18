@@ -14,12 +14,10 @@ from dowhy import CausalModel
 from causaltune.score.thompson import thompson_policy, extract_means_stds
 from causaltune.thirdparty.causalml import metrics
 from causaltune.score.erupt import ERUPT
+from causaltune.score.codec import codec_score
 from causaltune.utils import treatment_values, psw_joint_weights
 
 import dcor
-
-from scipy.spatial import distance
-from sklearn.neighbors import NearestNeighbors
 
 from scipy.stats import kendalltau
 
@@ -27,7 +25,9 @@ from sklearn.preprocessing import StandardScaler
 
 
 class DummyEstimator:
-    def __init__(self, cate_estimate: np.ndarray, effect_intervals: Optional[np.ndarray] = None):
+    def __init__(
+        self, cate_estimate: np.ndarray, effect_intervals: Optional[np.ndarray] = None
+    ):
         self.cate_estimate = cate_estimate
         self.effect_intervals = effect_intervals
 
@@ -98,14 +98,19 @@ class Scorer:
         self.multivalue = multivalue
         self.causal_model = copy.deepcopy(causal_model)
 
-        self.identified_estimand = causal_model.identify_effect(proceed_when_unidentifiable=True)
+        self.identified_estimand = causal_model.identify_effect(
+            proceed_when_unidentifiable=True
+        )
         if "Dummy" in propensity_model.__class__.__name__:
             self.constant_ptt = True
         else:
             self.constant_ptt = False
 
         if problem == "backdoor":
-            print("Fitting a Propensity-Weighted scoring estimator " "to be used in scoring tasks")
+            print(
+                "Fitting a Propensity-Weighted scoring estimator "
+                "to be used in scoring tasks"
+            )
             treatment_series = causal_model._data[causal_model._treatment[0]]
             # this will also fit self.propensity_model, which we'll also use in
             # self.erupt
@@ -124,7 +129,9 @@ class Scorer:
             if not hasattr(self.psw_estimator, "estimator") or not hasattr(
                 self.psw_estimator.estimator, "propensity_model"
             ):
-                raise ValueError("Propensity model fitting failed. Please check the setup.")
+                raise ValueError(
+                    "Propensity model fitting failed. Please check the setup."
+                )
             else:
                 print("Propensity Model Fitted Successfully")
 
@@ -247,7 +254,9 @@ class Scorer:
         YX_0 = Y0X[Y0X[split_test_by] == 0]
         select_cols = estimate.estimator._effect_modifier_names + ["yhat"]
 
-        energy_distance_score = dcor.energy_distance(YX_1[select_cols], YX_0[select_cols])
+        energy_distance_score = dcor.energy_distance(
+            YX_1[select_cols], YX_0[select_cols]
+        )
 
         return energy_distance_score
 
@@ -256,13 +265,17 @@ class Scorer:
         est = estimate.estimator
         # assert est.identifier_method in ["iv", "backdoor"]
         treatment_name = (
-            est._treatment_name if isinstance(est._treatment_name, str) else est._treatment_name[0]
+            est._treatment_name
+            if isinstance(est._treatment_name, str)
+            else est._treatment_name[0]
         )
         df["dy"] = estimate.estimator.effect_tt(df)
         df["yhat"] = df[est._outcome_name] - df["dy"]
 
         split_test_by = (
-            est.estimating_instrument_names[0] if est.identifier_method == "iv" else treatment_name
+            est.estimating_instrument_names[0]
+            if est.identifier_method == "iv"
+            else treatment_name
         )
         Y0X = copy.deepcopy(df)
 
@@ -324,7 +337,9 @@ class Scorer:
         Y0X_0_normalized = scaler.transform(Y0X_0[select_cols])
 
         # Calculate pairwise differences
-        differences_xy = Y0X_1_normalized[:, np.newaxis, :] - Y0X_0_normalized[np.newaxis, :, :]
+        differences_xy = (
+            Y0X_1_normalized[:, np.newaxis, :] - Y0X_0_normalized[np.newaxis, :, :]
+        )
 
         if use_propensity:
             try:
@@ -339,7 +354,9 @@ class Scorer:
                 treatment_series = Y0X_1[treatment_name]
                 YX_1_psw = np.zeros(YX_1_all_psw.shape[0])
                 for i in treatment_series.unique():
-                    YX_1_psw[treatment_series == i] = YX_1_all_psw[:, i][treatment_series == i]
+                    YX_1_psw[treatment_series == i] = YX_1_all_psw[:, i][
+                        treatment_series == i
+                    ]
 
                 YX_0_psw = propensitymodel.predict_proba(
                     Y0X_0[
@@ -376,7 +393,9 @@ class Scorer:
         cate_variance = np.var(cate_estimates)
         inverse_variance_component = 1 / (cate_variance + epsilon)
 
-        composite_score = alpha * normalized_score + (1 - alpha) * inverse_variance_component
+        composite_score = (
+            alpha * normalized_score + (1 - alpha) * inverse_variance_component
+        )
 
         return composite_score if np.isfinite(composite_score) else np.inf
 
@@ -438,14 +457,19 @@ class Scorer:
             float: propensity-score weighted energy distance score.
         """
 
-        Y0X, treatment_name, split_test_by = Scorer._Y0_X_potential_outcomes(estimate, df)
+        Y0X, treatment_name, split_test_by = Scorer._Y0_X_potential_outcomes(
+            estimate, df
+        )
 
         Y0X_1 = Y0X[Y0X[split_test_by] == 1]
         Y0X_0 = Y0X[Y0X[split_test_by] == 0]
 
         propensitymodel = self.psw_estimator.estimator.propensity_model
         YX_1_all_psw = propensitymodel.predict_proba(
-            Y0X_1[self.causal_model.get_effect_modifiers() + self.causal_model.get_common_causes()]
+            Y0X_1[
+                self.causal_model.get_effect_modifiers()
+                + self.causal_model.get_common_causes()
+            ]
         )
         treatment_series = Y0X_1[treatment_name]
 
@@ -455,7 +479,10 @@ class Scorer:
 
         propensitymodel = self.psw_estimator.estimator.propensity_model
         YX_0_psw = propensitymodel.predict_proba(
-            Y0X_0[self.causal_model.get_effect_modifiers() + self.causal_model.get_common_causes()]
+            Y0X_0[
+                self.causal_model.get_effect_modifiers()
+                + self.causal_model.get_common_causes()
+            ]
         )[:, 0]
 
         select_cols = estimate.estimator._effect_modifier_names + ["yhat"]
@@ -473,8 +500,12 @@ class Scorer:
             qt = QuantileTransformer(n_quantiles=200)
             X_quantiles = qt.fit_transform(Y0X[features])
 
-            Y0X_transformed = pd.DataFrame(X_quantiles, columns=features, index=Y0X.index)
-            Y0X_transformed.loc[:, ["yhat", split_test_by]] = Y0X[["yhat", split_test_by]]
+            Y0X_transformed = pd.DataFrame(
+                X_quantiles, columns=features, index=Y0X.index
+            )
+            Y0X_transformed.loc[:, ["yhat", split_test_by]] = Y0X[
+                ["yhat", split_test_by]
+            ]
 
             Y0X_1 = Y0X_transformed[Y0X_transformed[split_test_by] == 1]
             Y0X_0 = Y0X_transformed[Y0X_transformed[split_test_by] == 0]
@@ -494,7 +525,9 @@ class Scorer:
             xx_psw,
             dcor.distances.pairwise_distances(Y0X_0[select_cols], exponent=exponent),
         )
-        psw_energy_distance = 2 * np.mean(distance_xy) - np.mean(distance_xx) - np.mean(distance_yy)
+        psw_energy_distance = (
+            2 * np.mean(distance_xy) - np.mean(distance_xx) - np.mean(distance_yy)
+        )
         return psw_energy_distance
 
     @staticmethod
@@ -534,7 +567,10 @@ class Scorer:
             raise ValueError("Propensity model fitting failed. Please check the setup.")
 
         propensity_scores = self.psw_estimator.estimator.propensity_model.predict_proba(
-            df[self.causal_model.get_effect_modifiers() + self.causal_model.get_common_causes()]
+            df[
+                self.causal_model.get_effect_modifiers()
+                + self.causal_model.get_common_causes()
+            ]
         )
         if propensity_scores.ndim == 2:
             propensity_scores = propensity_scores[:, 1]
@@ -608,269 +644,6 @@ class Scorer:
 
         return qini_score["model"]
 
-    # NEW
-    @staticmethod
-    def randomNN(ids):
-        """
-        Generate a list of random nearest neighbors.
-
-        Parameters:
-        ids (array-like): List of indices to sample from.
-
-        Returns:
-        numpy.ndarray: Array of sampled indices with
-        no position i having x[i] == i.
-        """
-
-        m = len(ids)
-        # Sample random integers from 0 to m-2, size m, with replacement
-        x = np.random.choice(m - 1, m, replace=True)
-        # Adjust x to ensure no position i has x[i] == i
-        x = x + (x >= np.arange(m))
-        return np.array(ids)[x]
-
-    # NEW
-    @staticmethod
-    def estimateConditionalQ(Y, X, Z):
-        """
-        Estimate Q(Y, Z | X), the numerator of the measure of
-        conditional dependence of Y on Z given X.
-
-        Parameters:
-        Y (array-like): Vector of responses (length n).
-        X (array-like): Matrix of predictors (n by p).
-        Z (array-like): Matrix of predictors (n by q).
-
-        Returns:
-        float: Estimation of Q(Y, Z | X).
-        """
-
-        # Ensure X and Z are numpy arrays
-        if not isinstance(X, np.ndarray):
-            X = np.array(X)
-        if not isinstance(Z, np.ndarray):
-            Z = np.array(Z)
-
-        # To turn Z from shape (n,) to (n,1)
-        Z = Z.reshape(-1, 1)
-
-        n = len(Y)
-        W = np.hstack((X, Z))
-
-        # Compute the nearest neighbor of X
-        nn_X = NearestNeighbors(n_neighbors=3, algorithm="auto").fit(X)
-        nn_dists_X, nn_indices_X = nn_X.kneighbors(X)
-        nn_index_X = nn_indices_X[:, 1]
-
-        # Handle repeated data
-        repeat_data = np.where(nn_dists_X[:, 1] == 0)[0]
-        df_X = pd.DataFrame({"id": repeat_data, "group": nn_indices_X[repeat_data, 0]})
-        df_X["rnn"] = df_X.groupby("group")["id"].transform(Scorer.randomNN)
-        nn_index_X[repeat_data] = df_X["rnn"].values
-
-        # Nearest neighbors with ties
-        ties = np.where(nn_dists_X[:, 1] == nn_dists_X[:, 2])[0]
-        ties = np.setdiff1d(ties, repeat_data)
-
-        if len(ties) > 0:
-
-            def helper_ties(a):
-                distances = distance.cdist(X[a].reshape(1, -1), np.delete(X, a, axis=0)).flatten()
-                ids = np.where(distances == distances.min())[0]
-                x = np.random.choice(ids)
-                return x + (x >= a)
-
-            nn_index_X[ties] = [helper_ties(a) for a in ties]
-
-        # Compute the nearest neighbor of W
-        nn_W = NearestNeighbors(n_neighbors=3, algorithm="auto").fit(W)
-        nn_dists_W, nn_indices_W = nn_W.kneighbors(W)
-        nn_index_W = nn_indices_W[:, 1]
-
-        repeat_data = np.where(nn_dists_W[:, 1] == 0)[0]
-        df_W = pd.DataFrame({"id": repeat_data, "group": nn_indices_W[repeat_data, 0]})
-        df_W["rnn"] = df_W.groupby("group")["id"].transform(Scorer.randomNN)
-        nn_index_W[repeat_data] = df_W["rnn"].values
-
-        # Nearest neighbors with ties
-        ties = np.where(nn_dists_W[:, 1] == nn_dists_W[:, 2])[0]
-        ties = np.setdiff1d(ties, repeat_data)
-
-        if len(ties) > 0:
-            nn_index_W[ties] = [helper_ties(a) for a in ties]
-
-        # Estimate Q
-        R_Y = np.argsort(np.argsort(Y))  # Rank Y with ties method 'max'
-        Q_n = (
-            np.sum(np.minimum(R_Y, R_Y[nn_index_W])) - np.sum(np.minimum(R_Y, R_Y[nn_index_X]))
-        ) / (n**2)
-
-        return Q_n
-
-    # NEW
-    @staticmethod
-    def estimateConditionalS(Y, X):
-        """
-        Estimate S(Y, X), the denominator of the
-        measure of dependence of Y on Z given X.
-
-        Parameters:
-        Y (array-like): Vector of responses (length n).
-        X (array-like): Matrix of predictors (n by p).
-
-        Returns:
-        float: Estimation of S(Y, X).
-        """
-
-        # Ensure X is a numpy array
-        if not isinstance(X, np.ndarray):
-            X = np.array(X)
-
-        n = len(Y)
-
-        # Compute the nearest neighbor of X
-        nn_X = NearestNeighbors(n_neighbors=3, algorithm="auto").fit(X)
-        nn_dists_X, nn_indices_X = nn_X.kneighbors(X)
-        nn_index_X = nn_indices_X[:, 1]
-
-        # Handle repeated data
-        repeat_data = np.where(nn_dists_X[:, 1] == 0)[0]
-        df_X = pd.DataFrame({"id": repeat_data, "group": nn_indices_X[repeat_data, 0]})
-        df_X["rnn"] = df_X.groupby("group")["id"].transform(Scorer.randomNN)
-        nn_index_X[repeat_data] = df_X["rnn"].values
-
-        # Nearest neighbors with ties
-        ties = np.where(nn_dists_X[:, 1] == nn_dists_X[:, 2])[0]
-        ties = np.setdiff1d(ties, repeat_data)
-
-        if len(ties) > 0:
-
-            def helper_ties(a):
-                distances = distance.cdist(X[a].reshape(1, -1), np.delete(X, a, axis=0)).flatten()
-                ids = np.where(distances == distances.min())[0]
-                x = np.random.choice(ids)
-                return x + (x >= a)
-
-            nn_index_X[ties] = [helper_ties(a) for a in ties]
-
-        # Estimate S
-        R_Y = np.argsort(np.argsort(Y))  # Rank Y with ties method 'max'
-        S_n = np.sum(R_Y - np.minimum(R_Y, R_Y[nn_index_X])) / (n**2)
-
-        return S_n
-
-    # NEW
-    @staticmethod
-    def estimateConditionalT(Y, Z, X):
-        """
-        Estimate T(Y, Z | X), the measure of dependence of Y on Z given X.
-
-        Parameters:
-        Y (array-like): Vector of responses (length n).
-        Z (array-like): Matrix of predictors (n by q).
-        X (array-like): Matrix of predictors (n by p).
-
-        Returns:
-        float: Estimation of T(Y, Z | X).
-        """
-
-        S = Scorer.estimateConditionalS(Y, X)
-
-        # Happens only if Y is constant
-        if S == 0:
-            return 1
-        else:
-            return Scorer.estimateConditionalQ(Y, X, Z) / S
-
-    # NEW
-    @staticmethod
-    def codec(Y, Z, X=None, na_rm=True):
-        """
-        Estimate the conditional dependence coefficient (CODEC).
-
-        The conditional dependence coefficient (CODEC) is a measure of the
-        amount of conditional dependence between a random variable Y and a
-        random vector Z given a random vector X, based on an i.i.d. sample of
-        (Y, Z, X). The coefficient is asymptotically guaranteed to be between
-        0 and 1.
-
-        Parameters:
-            Y (array-like): Vector of responses (length n).
-            Z (array-like): Matrix of predictors (n by q).
-            X (array-like, optional): Matrix of predictors (n by p). Default
-            is None.
-            na_rm (bool): If True, remove NAs.
-
-        Returns:
-            float: The conditional dependence coefficient (CODEC) of Y and Z
-            given X. If X is None, this is just a measure of the dependence
-            between Y and Z.
-
-        References:
-            Azadkia, M. and Chatterjee, S. (2019). A simple measure of
-            conditional dependence. https://arxiv.org/pdf/1910.12327.pdf
-        """
-
-        if X is None:
-            # Ensure inputs are in proper format
-            if not isinstance(Y, np.ndarray):
-                Y = np.array(Y)
-            if not isinstance(Z, np.ndarray):
-                Z = np.array(Z)
-                # print(f"Shape of Z: {Z.shape}")
-                # print(f"Z is: {Z}")
-
-            if len(Y) != Z.shape[0]:
-                raise ValueError("Number of rows of Y and Z should be equal.")
-            if na_rm:
-                # Remove NAs
-                mask = np.isfinite(Y) & np.all(np.isfinite(Z), axis=1)
-                Z = Z[mask]
-                Y = Y[mask]
-
-            n = len(Y)
-            if n < 2:
-                raise ValueError("Number of rows with no NAs should be greater than 1.")
-
-            return Scorer.estimateConditionalQ(Y, Z, np.zeros((n, 0)))
-
-        # Ensure inputs are in proper format
-        if not isinstance(Y, np.ndarray):
-            Y = np.array(Y)
-        if not isinstance(X, np.ndarray):
-            X = np.array(X)
-        if not isinstance(Z, np.ndarray):
-            Z = np.array(Z)
-        if len(Y) != X.shape[0] or len(Y) != Z.shape[0] or X.shape[0] != Z.shape[0]:
-            raise ValueError("Number of rows of Y, X, and Z should be equal.")
-
-        n = len(Y)
-        if n < 2:
-            raise ValueError("Number of rows with no NAs should be greater than 1.")
-
-        return Scorer.estimateConditionalT(Y, Z, X)
-
-    # NEW
-    @staticmethod
-    def identify_confounders(df: pd.DataFrame, treatment_col: str, outcome_col: str) -> list:
-        """
-        Identify confounders in a DataFrame.
-
-        Args:
-            df (pd.DataFrame): Input dataframe
-            treatment_col (str): Name of the treatment column
-            outcome_col (str): Name of the outcome column
-
-        Returns:
-            list: List of confounders' column names
-        """
-
-        confounders = [
-            col for col in df.columns if col not in [treatment_col, outcome_col, "random", "index"]
-        ]
-        return confounders
-
-    # NEW
     @staticmethod
     def codec_score(estimate: CausalEstimate, df: pd.DataFrame) -> float:
         """Calculate the CODEC score for the effect of treatment on y_factual.
@@ -882,31 +655,7 @@ class Scorer:
         Returns:
             float: CODEC score
         """
-        est = estimate.estimator
-        treatment_name = (
-            est._treatment_name if isinstance(est._treatment_name, str) else est._treatment_name[0]
-        )
-        outcome_name = est._outcome_name
-        confounders = Scorer.identify_confounders(df, treatment_name, outcome_name)
-
-        ########
-        cate_est = est.effect(df)
-        standard_deviations = np.std(cate_est)
-
-        df["dy"] = est.effect_tt(df)
-
-        df["yhat"] = df[est._outcome_name] - df["dy"]
-
-        # have to use corrected y, not y factual to get the estimators
-        # contribution in
-        Y = df["yhat"]
-        Z = df[treatment_name]
-        X = df[confounders]
-
-        if standard_deviations < 0.01:
-            return np.inf
-
-        return Scorer.codec(Y, Z, X)
+        return codec_score(estimate, df)
 
     @staticmethod
     def auc_make_score(
@@ -996,11 +745,15 @@ class Scorer:
 
         mean_ = outcome[treatment == 1].mean() - outcome[treatment == 0].mean()
         std1 = outcome[treatment == 1].std() / (math.sqrt(treated) + 1e-3)
-        std2 = outcome[treatment == 0].std() / (math.sqrt(len(outcome) - treated) + 1e-3)
+        std2 = outcome[treatment == 0].std() / (
+            math.sqrt(len(outcome) - treated) + 1e-3
+        )
         std_ = math.sqrt(std1 * std1 + std2 * std2)
         return (mean_, std_, len(treatment))
 
-    def group_ate(self, df: pd.DataFrame, policy: Union[pd.DataFrame, np.ndarray]) -> pd.DataFrame:
+    def group_ate(
+        self, df: pd.DataFrame, policy: Union[pd.DataFrame, np.ndarray]
+    ) -> pd.DataFrame:
         """
         Compute the average treatment effect (ATE) for different groups
         specified by a policy.
@@ -1019,7 +772,10 @@ class Scorer:
         for p in sorted(list(policy.unique())):
             tmp[p] = self.ate(df[policy == p])
 
-        tmp2 = [{"policy": str(p), "mean": m, "std": s, "count": c} for p, (m, s, c) in tmp.items()]
+        tmp2 = [
+            {"policy": str(p), "mean": m, "std": s, "count": c}
+            for p, (m, s, c) in tmp.items()
+        ]
 
         return pd.DataFrame(tmp2)
 
@@ -1042,7 +798,9 @@ class Scorer:
             float: The BITE score. Higher values indicate better model performance.
         """
         if N_values is None:
-            N_values = list(range(10, 21)) + list(range(25, 51, 5)) + list(range(60, 101, 10))
+            N_values = (
+                list(range(10, 21)) + list(range(25, 51, 5)) + list(range(60, 101, 10))
+            )
 
         est = estimate.estimator
         treatment_name = est._treatment_name
@@ -1063,7 +821,10 @@ class Scorer:
         if hasattr(self.psw_estimator.estimator, "propensity_model"):
             propensity_model = self.psw_estimator.estimator.propensity_model
             working_df["propensity"] = propensity_model.predict_proba(
-                df[self.causal_model.get_effect_modifiers() + self.causal_model.get_common_causes()]
+                df[
+                    self.causal_model.get_effect_modifiers()
+                    + self.causal_model.get_common_causes()
+                ]
             )[:, 1]
         else:
             raise ValueError("Propensity model is not available.")
@@ -1134,7 +895,9 @@ class Scorer:
                     bin_weights = bin_data["weights"].values
                     if bin_weights.sum() > 0 and not np.isnan(naive_est):
                         try:
-                            avg_est_ite = np.average(bin_data["estimated_ITE"], weights=bin_weights)
+                            avg_est_ite = np.average(
+                                bin_data["estimated_ITE"], weights=bin_weights
+                            )
                             bin_stats.append(
                                 {
                                     "ITE_bin": bin_idx,
@@ -1288,7 +1051,9 @@ class Scorer:
                 out["bite"] = bite_score
 
             if r_scorer is not None:
-                out["r_score"] = Scorer.r_make_score(estimate, df, cate_estimate, r_scorer)
+                out["r_score"] = Scorer.r_make_score(
+                    estimate, df, cate_estimate, r_scorer
+                )
 
             # values = values.rename(columns={treatment_name: "treated"})
             assert len(values) == len(df), "Index weirdness when adding columns!"
@@ -1321,7 +1086,9 @@ class Scorer:
         return out
 
     @staticmethod
-    def best_score_by_estimator(scores: Dict[str, dict], metric: str) -> Dict[str, dict]:
+    def best_score_by_estimator(
+        scores: Dict[str, dict], metric: str
+    ) -> Dict[str, dict]:
         """Obtain best score for each estimator.
 
         Args:
@@ -1336,16 +1103,27 @@ class Scorer:
         for k, v in scores.items():
             if "estimator_name" not in v:
                 raise ValueError(
-                    f"Malformed scores dict, 'estimator_name' field missing " f"in{k}, {v}"
+                    f"Malformed scores dict, 'estimator_name' field missing "
+                    f"in{k}, {v}"
                 )
 
         estimator_names = sorted(
-            list(set([v["estimator_name"] for v in scores.values() if "estimator_name" in v]))
+            list(
+                set(
+                    [
+                        v["estimator_name"]
+                        for v in scores.values()
+                        if "estimator_name" in v
+                    ]
+                )
+            )
         )
         best = {}
         for name in estimator_names:
             est_scores = [
-                v for v in scores.values() if "estimator_name" in v and v["estimator_name"] == name
+                v
+                for v in scores.values()
+                if "estimator_name" in v and v["estimator_name"] == name
             ]
             best[name] = (
                 min(est_scores, key=lambda x: x[metric])
