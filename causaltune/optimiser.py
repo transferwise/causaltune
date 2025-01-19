@@ -94,6 +94,7 @@ class CausalTune:
         test_size=None,
         num_samples=-1,
         propensity_model="dummy",
+        propensity_automl_estimators: Optional[List[str]] = None,
         outcome_model="nested",
         components_task="regression",
         components_verbose=0,
@@ -185,6 +186,7 @@ class CausalTune:
         self._settings["component_models"]["n_jobs"] = components_njobs
         self._settings["component_models"]["time_budget"] = components_time_budget
         self._settings["component_models"]["eval_method"] = "holdout"
+        self._settings["propensity_automl_estimators"] = propensity_automl_estimators
 
         if 0 < train_size < 1:
             component_test_size = 1 - train_size
@@ -224,9 +226,11 @@ class CausalTune:
         if propensity_model == "dummy":
             self.propensity_model = DummyClassifier(strategy="prior")
         elif propensity_model == "auto":
-            self.propensity_model = AutoML(
-                **{**self._settings["component_models"], "task": "classification"}
-            )
+            automl_args = {**self._settings["component_models"], "task": "classification"}
+            if self._settings["propensity_automl_estimators"]:
+                automl_args["estimator_list"] = self._settings["propensity_automl_estimators"]
+
+            self.propensity_model = AutoML(**automl_args)
         elif hasattr(propensity_model, "fit") and hasattr(propensity_model, "predict_proba"):
             self.propensity_model = propensity_model
         else:

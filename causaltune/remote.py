@@ -7,6 +7,6 @@ def remote_exec(function, args, use_ray=False):
     else:
         from joblib import Parallel, delayed
 
-        return Parallel(n_jobs=2, backend="threading")(delayed(function)(*args) for i in range(1))[
+        return Parallel(n_jobs=1, backend="threading")(delayed(function)(*args) for i in range(1))[
             0
         ]
