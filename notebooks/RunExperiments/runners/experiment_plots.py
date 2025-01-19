@@ -70,7 +70,7 @@ def generate_plots(
         "bite": "BITE",
         "policy_risk": "Policy\nRisk",
         "energy_distance": "Energy\nDistance",
-        "psw_energy_distance": "PSW\nEnergy\nDistance",
+        "psw_energy_distance": "Energy\nDistance",
         "norm_erupt": "Normalized\nERUPT",
     }
 

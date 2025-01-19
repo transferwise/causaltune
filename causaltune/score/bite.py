@@ -9,15 +9,20 @@ def bite(
     working_df: pd.DataFrame,
     treatment_name: str,
     outcome_name: str,
+    min_N: int = 10,
+    max_N: int = 1000,
+    num_N: int = 20,
     N_values: Optional[List[int]] = None,
+    clip_propensity: float = 0.05,
 ) -> float:
+    max_N = int(min(max_N, len(working_df) / 10))
     if N_values is None:
-        N_values = exponential_spacing(10, 100, 20)
+        N_values = exponential_spacing(min_N, max_N, num_N)
     # Calculate weights with clipping to avoid extremes
     working_df["weights"] = np.where(
         working_df[treatment_name] == 1,
-        1 / np.clip(working_df["propensity"], 0.05, 0.95),
-        1 / np.clip(1 - working_df["propensity"], 0.05, 0.95),
+        1 / np.clip(working_df["propensity"], clip_propensity, 1 - clip_propensity),
+        1 / np.clip(1 - working_df["propensity"], clip_propensity, 1 - clip_propensity),
     )
 
     kendall_tau_values = []

@@ -19,7 +19,7 @@ metrics = [
 
 estimators = get_estimator_list(kind, exclude_patterns=["SLearner", "TLearner", "XLearner"])
 
-use_ray = False
+use_ray = True
 out_dir = run_batch(
     identifier,
     kind,

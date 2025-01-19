@@ -4,8 +4,7 @@ from experiment_runner import run_batch, get_estimator_list
 from experiment_plots import generate_plots
 
 identifier = "Egor_test"
-kind = "RCT"
-
+kind = "KC"
 metrics = [
     "erupt",
     # "greedy_erupt",  # regular erupt was made probabilistic,
@@ -17,13 +16,19 @@ metrics = [
     "codec",  # NEW
     "bite",  # NEW
 ]
-estimators = get_estimator_list(kind)
+estimators = get_estimator_list(kind, exclude_patterns=["SLearner", "TLearner", "XLearner"])
+ptt_estimators = [
+    "lgbm",
+    "lrl2",
+]
+
 use_ray = True
 out_dir = run_batch(
     identifier,
     kind,
     metrics,
     estimators=estimators,
+    propensity_automl_estimators=ptt_estimators,
     dataset_path=os.path.realpath("../RunDatasets"),
     use_ray=use_ray,
 )

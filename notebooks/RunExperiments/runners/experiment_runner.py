@@ -12,6 +12,9 @@ import ray
 from sklearn.model_selection import train_test_split
 
 
+sys.path.insert(0, os.getcwd())
+import causaltune  # noqa: E402
+
 from causaltune import CausalTune
 from causaltune.data_utils import CausalityDataset
 from causaltune.models.passthrough import passthrough_model
@@ -112,6 +115,7 @@ def run_experiment(
     estimators: List[str],
     dataset_path: str,
     use_ray: bool,
+    propensity_automl_estimators: Optional[List[str]] = None,
 ):
     # Process datasets
     data_sets = {}
@@ -125,6 +129,7 @@ def run_experiment(
         name = " ".join(parts[1:])
         file_path = f"{dataset_path}/{size}/{name}.pkl"
         data_sets[f"{size} {name}"] = load_dataset(file_path)
+    run_kind = dataset.split("_")[1]
 
     out_dir = f"../EXPERIMENT_RESULTS_{args.identifier}"
     os.makedirs(out_dir, exist_ok=True)
@@ -136,24 +141,22 @@ def run_experiment(
     already_running = False
     if use_ray:
         try:
-            runner = ray.get_actor("TaskRunner")
+            runner = ray.get_actor(f"TaskRunner {run_kind}")
             print("\n" * 4)
             print(
                 "!!! Found an existing detached TaskRunner. Will assume the tasks have already been submitted."
             )
             print(
-                "!!! If you want to re-run the experiments from scratch, "
-                'run ray.kill(ray.get_actor("TaskRunner", namespace="{}")) or recreate the cluster.'.format(
-                    RAY_NAMESPACE
-                )
+                f"!!! If you want to re-run the experiments from scratch, "
+                'run ray.kill(ray.get_actor("TaskRunner {run_kind}", namespace="{RAY_NAMESPACE}")) or recreate the cluster.'
             )
             print("\n" * 4)
             already_running = True
         except ValueError:
             print("Ray: no detached TaskRunner found, creating...")
             # This thing will be alive even if the host program exits
-            # Must be killed explicitly: ray.kill(ray.get_actor("TaskRunner"))
-            runner = TaskRunner.options(name="TaskRunner", lifetime="detached").remote()
+            # Must be killed explicitly: ray.kill(ray.get_actor(f"TaskRunner {run_kind}"))
+            runner = TaskRunner.options(name=f"TaskRunner {run_kind}", lifetime="detached").remote()
 
     out = []
     if not already_running:
@@ -190,6 +193,7 @@ def run_experiment(
                             args.components_time_budget,
                             out_fn,
                             estimators,
+                            propensity_automl_estimators,
                         )
                     )
                 else:
@@ -202,6 +206,7 @@ def run_experiment(
                         args.components_time_budget,
                         out_fn,
                         estimators,
+                        propensity_automl_estimators,
                     )
                     out.append(results)
 
@@ -238,6 +243,7 @@ def run_batch(
     estimators: List[str],
     dataset_path: str,
     use_ray: bool = False,
+    propensity_automl_estimators: Optional[List[str]] = None,
 ):
     args = parse_arguments()
     args.identifier = identifier
@@ -255,12 +261,19 @@ def run_batch(
         # Assuming we port-mapped already by running ray dashboard
         ray.init(
             "ray://localhost:10001",
-            runtime_env={"working_dir": ".", "pip": ["causaltune", "catboost", "ray[tune]"]},
+            runtime_env={
+                "working_dir": ".",
+                "pip": ["causaltune", "catboost", "ray[tune]", "flaml[blendsearch]"],
+            },
             namespace=RAY_NAMESPACE,
         )
 
     out_dir = run_experiment(
-        args, estimators=estimators, dataset_path=dataset_path, use_ray=use_ray
+        args,
+        estimators=estimators,
+        dataset_path=dataset_path,
+        use_ray=use_ray,
+        propensity_automl_estimators=propensity_automl_estimators,
     )
     return out_dir
 
@@ -275,8 +288,8 @@ class TaskRunner:
     def __init__(self):
         self.futures = {}
 
-    def remote_single_run(self, *args):
-        ref = remote_single_run.remote(*args)
+    def remote_single_run(self, *args, **kwargs):
+        ref = remote_single_run.remote(*args, **kwargs)
         self.futures[ref.hex()] = ref
         return ref.hex()
 
@@ -310,6 +323,7 @@ def single_run(
     components_time_budget: int,
     out_fn: str,
     estimators: List[str],
+    propensity_automl_estimators: Optional[List[str]] = None,
     outcome_model: str = "auto",
     i_run: int = 1,
 ):
@@ -342,6 +356,7 @@ def single_run(
             store_all_estimators=True,
             propensity_model=propensity_model,
             outcome_model=outcome_model,
+            propensity_automl_estimators=propensity_automl_estimators,
             use_ray=False,
         )
 

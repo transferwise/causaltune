@@ -14,16 +14,16 @@ from dowhy import CausalModel
 from causaltune.score.thompson import thompson_policy, extract_means_stds
 from causaltune.thirdparty.causalml import metrics
 from causaltune.score.erupt import ERUPT
-from causaltune.score.bite import bite
+from .bite import bite
 from causaltune.utils import treatment_values, psw_joint_weights
 
 import dcor
 
 from scipy.spatial import distance
 from sklearn.neighbors import NearestNeighbors
-
-
 from sklearn.preprocessing import StandardScaler
+
+logger = logging.getLogger(__name__)
 
 
 class DummyEstimator:
@@ -93,7 +93,7 @@ class Scorer:
         Access methods and attributes via `CausalTune.scorer`.
 
         """
-
+        logger.info("Initializing Scorer")
         self.problem = problem
         self.multivalue = multivalue
         self.causal_model = copy.deepcopy(causal_model)
@@ -341,8 +341,8 @@ class Scorer:
         # Normalize features
         select_cols = estimate.estimator._effect_modifier_names + ["yhat"]
         scaler = StandardScaler()
-        Y0X_1_normalized = scaler.fit_transform(Y0X_1[select_cols])
-        Y0X_0_normalized = scaler.transform(Y0X_0[select_cols])
+        Y0X_0_normalized = scaler.fit_transform(Y0X_0[select_cols])
+        Y0X_1_normalized = scaler.transform(Y0X_1[select_cols])
 
         # Calculate pairwise differences
         differences_xy = Y0X_1_normalized[:, np.newaxis, :] - Y0X_0_normalized[np.newaxis, :, :]
@@ -927,7 +927,7 @@ class Scorer:
         if standard_deviations < 0.01:
             return np.inf
 
-        return Scorer.codec(Y, Z, X)
+        return abs(Scorer.codec(Y, Z, X))
 
     @staticmethod
     def auc_make_score(
@@ -945,7 +945,7 @@ class Scorer:
             float: area under the uplift curve
 
         """
-
+        print("running auuc_score")
         est = estimate.estimator
         new_df = pd.DataFrame()
         new_df["y"] = df[est._outcome_name]
